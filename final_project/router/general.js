@@ -4,6 +4,7 @@ let isValid = require("./auth_users.js").isValid;
 let users = require("./auth_users.js").users;
 const public_users = express.Router();
 
+const axios = require('axios');
 
 public_users.post("/register", (req,res) => {
   const{username, password}=req.body;
@@ -24,69 +25,105 @@ return res.status(200).json({ message: "User registered successfully" });
 });
 
 // Get the book list available in the shop
-public_users.get('/',function (req, res) {
-  //Write your code here
-  return res.status(200).send(JSON.stringify(books, null, 4));
-});
-
-// Get book details based on ISBN
-public_users.get('/isbn/:isbn',function (req, res) {
-  //Write your code here
-  const isbn = req.params.isbn;
-  const bookId = parseInt(isbn);
-
-  if (books[bookId]) {
-    return res.status(200).json(books[bookId]);
-  } else {
-    return res.status(404).json({ message: "Book not found" });
-  }
-
- });
-  
-// Get book details based on author
-public_users.get('/author/:author',function (req, res) {
-    const author = req.params.author;
-    const matchingBooks = [];
-  
-    // 取得所有 book key
-    const bookIds = Object.keys(books);
-  
-    // 遍歷所有書
-    bookIds.forEach(id => {
-      if (books[id].author.toLowerCase() === author.toLowerCase()) {
-        matchingBooks.push({ isbn: id, ...books[id] });
-      }
+public_users.get("/", (req, res) => {
+    // 以 Promise 取得資料
+    const getBooks = new Promise((resolve, reject) => {
+      resolve(books);
     });
   
-    if (matchingBooks.length > 0) {
-      return res.status(200).json(matchingBooks);
-    } else {
-      return res.status(404).json({ message: "No books found for this author" });
+    getBooks
+      .then(data => {
+        return res.status(200).json(data);
+      })
+      .catch(err => {
+        return res.status(500).json({ message: "Error fetching books" });
+      });
+  });
+
+
+// Get book details based on ISBN
+public_users.get("/isbn/:isbn", async (req, res) => {
+    try {
+        const isbn = req.params.isbn;
+
+        // 這裡打自己的 endpoint
+        const response = await axios.get(`http://localhost:5000/booksdata/${isbn}`);
+
+        res.status(200).json(response.data);
+    } catch (error) {
+        res.status(404).json({ message: "Book not found" });
     }
+});
+
+public_users.get("/booksdata/:isbn", (req, res) => {
+    const isbn = req.params.isbn;
+    const bookId = parseInt(isbn);
+    if (books[bookId]) {
+        res.status(200).json(books[bookId]);
+    } else {
+        res.status(404).json({ message: "Book not found" });
+    }
+});
+
+  
+// Get book details based on author with Promise
+public_users.get('/author/:author', function (req, res) {
+    const author = req.params.author;
+
+    new Promise((resolve, reject) => {
+        const matchingBooks = [];
+        const bookIds = Object.keys(books);
+
+        bookIds.forEach(id => {
+            if (books[id].author.toLowerCase() === author.toLowerCase()) {
+                matchingBooks.push({ isbn: id, ...books[id] });
+            }
+        });
+
+        if (matchingBooks.length > 0) {
+            resolve(matchingBooks);
+        } else {
+            reject("No books found for this author");
+        }
+    })
+    .then(data => {
+        return res.status(200).json(data);
+    })
+    .catch(err => {
+        return res.status(404).json({ message: err });
+    });
+
 });
 
 // Get all books based on title
-public_users.get('/title/:title', function (req, res) {
-    const title = req.params.title.toLowerCase();
-    const matchingBooks = [];
+public_users.get('/title/:title', async function (req, res) {
+    try {
+        const title = req.params.title.toLowerCase();
 
-    const bookIds = Object.keys(books);
+        // 使用 axios 呼叫本地 API (模擬)
+        const response = await axios.get('http://localhost:5000/');
+        const allBooks = response.data;
 
-    bookIds.forEach(id => {
-        if (books[id].title.toLowerCase() === title) {
-            matchingBooks.push({ isbn: id, ...books[id] });
+        const bookIds = Object.keys(allBooks);
+
+        const matchingBooks = [];
+        bookIds.forEach(id => {
+            if (allBooks[id].title.toLowerCase() === title) {
+                matchingBooks.push({ isbn: id, ...allBooks[id] });
+            }
+        });
+
+        if (matchingBooks.length > 0) {
+            return res.status(200).json(matchingBooks);
+        } else {
+            return res.status(404).json({ message: "No books found with the given title" });
         }
-    });
-
-    if (matchingBooks.length > 0) {
-        return res.status(200).json(matchingBooks);
-    } else {
-        return res.status(404).json({ message: "No books found with the given title" });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Error retrieving book data" });
     }
-    
+
 });
-
-
 //  Get book review
 public_users.get('/review/:isbn',function (req, res) {
   //Write your code here
