@@ -25,35 +25,43 @@ return res.status(200).json({ message: "User registered successfully" });
 });
 
 // Get the book list available in the shop
-public_users.get("/", (req, res) => {
-    // 以 Promise 取得資料
-    const getBooks = new Promise((resolve, reject) => {
-      resolve(books);
-    });
-  
-    getBooks
-      .then(data => {
-        return res.status(200).json(data);
-      })
-      .catch(err => {
-        return res.status(500).json({ message: "Error fetching books" });
-      });
-  });
-
-
-// Get book details based on ISBN
-public_users.get("/isbn/:isbn", async (req, res) => {
+public_users.get("/", async (req, res) => {
     try {
-        const isbn = req.params.isbn;
-
-        // 這裡打自己的 endpoint
-        const response = await axios.get(`http://localhost:5000/booksdata/${isbn}`);
-
-        res.status(200).json(response.data);
-    } catch (error) {
-        res.status(404).json({ message: "Book not found" });
+        const data = await new Promise((resolve, reject) => {
+            resolve(books);
+        });
+        return res.status(200).json(data);
+    } catch (err) {
+        return res.status(500).json({ message: "Error fetching books" });
     }
 });
+
+
+// Get book details based on ISBN (using Promises)
+public_users.get("/isbn/:isbn", (req, res) => {
+    const isbn = req.params.isbn;
+
+    // 這裡建立一個 Promise 包住 axios
+    const getBook = new Promise((resolve, reject) => {
+        axios
+            .get(`http://localhost:5000/booksdata/${isbn}`)
+            .then(response => {
+                resolve(response.data);
+            })
+            .catch(err => {
+                reject(err);
+            });
+    });
+
+    getBook
+        .then(data => {
+            res.status(200).json(data);
+        })
+        .catch(err => {
+            res.status(404).json({ message: "Book not found" });
+        });
+});
+
 
 public_users.get("/booksdata/:isbn", (req, res) => {
     const isbn = req.params.isbn;
@@ -64,6 +72,7 @@ public_users.get("/booksdata/:isbn", (req, res) => {
         res.status(404).json({ message: "Book not found" });
     }
 });
+
 
   
 // Get book details based on author with Promise
